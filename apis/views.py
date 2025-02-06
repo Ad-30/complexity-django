@@ -438,72 +438,55 @@ class CognitiveComplexityViewNodeFeatures(APIView):
 class CognitiveComplexityViewFixedSizeVector(APIView):
     def post(self, request):
         try:
+            # Set seed values
             os.environ['PYTHONHASHSEED'] = '0'
             np.random.seed(42)
             tf.random.set_seed(42)
+
+            # Load data
             data = request.data.get("node_feature_dict")
             G, _ = build_graph_from_dict(data)
             A, X = get_adjacency_and_features(G)
 
-            # Normalize A
+            # Normalize adjacency matrix
             A_normalized = normalize_adjacency(A)
 
             # Initialize weight matrix W
-            input_dim = X.shape[1]
-            output_dim = 16  # 16 output features per node
+            input_dim, output_dim = X.shape[1], 16
             W = np.random.randn(input_dim, output_dim)
 
             # Perform forward pass
             H = forward_pass(A_normalized, X, W)
-            result  = np.dot(A,X)
 
-            AX_with_self_loops = compute_AX_with_self_loops(A, X)
-            A_with_loops = A.copy()
-            np.fill_diagonal(A_with_loops, 1)  # Add self-loops
-
-            # Normalize A with self-loops
-            A_normalized_with_loops = normalize_adjacency(A_with_loops)
-
-            # Recompute AX with normalized A
-            AX_with_loops = np.dot(A_normalized_with_loops, X)
-
-            AX_with_loops = np.dot(A_normalized_with_loops, X)
-
-            # Normalize AX using D^-1 * AX
-            DAX = normalize_features(A_with_loops, AX_with_loops)
+            # Compute AX with self-loops and normalize
+            np.fill_diagonal(A, 1)  # Add self-loops directly to A
             A_normalized_symmetric = symmetric_normalization(A)
+            AX_with_loops = np.dot(A_normalized_symmetric, X)
+            DAX = normalize_features(A, AX_with_loops)
 
-            # Perform forward pass using the symmetric normalized adjacency matrix
-            H_symmetric = forward_pass(A_normalized_symmetric, X, W)
-            input_dim = 7  # 7 features: IN, OUT, IF-THEN-ELSE, WHILE, FOR, EXP, FC
-            hidden_dim = 32  # Number of neurons in the hidden layer
-            output_dim = 7  # Number of neurons in the output layer (same as input features)
-
-            # Initialize the weight matrices
+            # Initialize weights for 2-layer GCN
+            input_dim, hidden_dim, output_dim = 7, 32, 7
             W1, W2 = initialize_weights(input_dim, hidden_dim, output_dim)
 
-            # Perform symmetric normalization on adjacency matrix A
-            A_normalized_symmetric = symmetric_normalization(A)
-
-            # Perform the forward pass through the 2-layer GCN
+            # Forward pass through 2-layer GCN
             output_features = forward_pass_2layer(A_normalized_symmetric, X, W1, W2)
 
-            pooled_vector = max_pooling(output_features)
-
-            pooled_vector = np.array([output_features[0]])
-            pooled_vector = np.round(pooled_vector, 2)
-            # print(pooled_vector)
+            # Use first element and round
+            pooled_vector = np.round(np.array([output_features[0]]), 2)
+            print(pooled_vector)
+            # Load model once (could be optimized further by caching)
             model = load_model("complexipy.keras", compile=False)
             defect_status = predict_defect_status(model, pooled_vector)
+
             return JsonResponse({
-                "fixed_size_vector": pooled_vector.tolist(),  # Convert NumPy array to list
-                "prediction": int(defect_status[0][0])  # Convert NumPy scalar to int
+                "fixed_size_vector": pooled_vector.tolist(),
+                "prediction": int(defect_status[0][0])
             }, status=200)
 
-        
+        except KeyError as e:
+            return JsonResponse({"error": f"Missing key: {e}"}, status=400)
+        except ValueError as e:
+            return JsonResponse({"error": f"Value error: {e}"}, status=400)
         except Exception as e:
-            error_details = traceback.format_exc()
-            return JsonResponse({
-                "error": str(e),
-                "traceback": error_details  # Include traceback in response
-            }, status=500)
+            return JsonResponse({"error": str(e), "traceback": traceback.format_exc()}, status=500)
+
