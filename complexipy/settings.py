@@ -23,9 +23,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-k2)f_&f61u%1g#pc7yuo2_55w89mf5b-#_jvc28abc(5%yw7n*'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'apis',
 ]
 
 MIDDLEWARE = [
@@ -77,14 +78,28 @@ CORS_ALLOWED_ORIGINS = [
 ]
 CORS_ALLOW_ALL_ORIGINS = True
 
-CORS_ALLOW_METHODS = [
+CORS_ALLOW_METHODS = (
+    "DELETE",
     "GET",
+    "OPTIONS",
+    "PATCH",
     "POST",
     "PUT",
-    "PATCH",
-    "DELETE",
-    "OPTIONS",
-]
+)
+CORS_ALLOW_HEADERS = (
+    "X-Access-Key",
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+)
+CORS_ALLOW_CREDENTIALS = False
+CORS_ALLOWED_ORIGINS = ['*']
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
